@@ -71,7 +71,11 @@ use crate::system::{
         I2C_KHZ,
         SYS_CLK_HZ,
     },
-    notification::NotificationManager,
+    notification::{
+        NotificationManager,
+        Notification,
+        BUFF_COUNT
+    }
 };
 
 
@@ -88,6 +92,7 @@ const APP: () = {
     static mut IMNG: IngressManager = ();
     static mut INPUT_MGR: InputManager = ();
     static mut DMNG: DisplayManager = ();
+    static mut NOTIFICATIONS: [Notification; BUFF_COUNT] = [Notification::default(); BUFF_COUNT];
     static mut USART2_RX: hal::serial::Rx<hal::stm32l4::stm32l4x2::USART2> = ();
     static mut DISPLAY: Ssd1351 = ();
     static mut BT_CONN: BluetoothConnectedPin = ();
@@ -109,7 +114,7 @@ const APP: () = {
     static mut APPLICATION_RAM: [u8; 16 * 1024] = [0u8; 16 * 1024];
     
     /// Intialization of the hardware and the kernel - mostly boiler plate init's from libraries
-    #[init(resources = [DMA_BUFFER, APPLICATION_RAM, FRAME_BUFFER, LOGGER])]
+    #[init(resources = [DMA_BUFFER, APPLICATION_RAM, FRAME_BUFFER, NOTIFICATIONS, LOGGER])]
     fn init() -> init::LateResources {
         core.DCB.enable_trace(); // required for DWT cycle clounter to work when not connected to the debugger
         core.DWT.enable_cycle_counter();
@@ -238,6 +243,7 @@ const APP: () = {
 
         #[cfg(feature = "dyn-tsc-cal")]
         let tsc_threshold =  {
+            // let mut middle_button = middle_button;
             const TSC_SAMPLES: u16 = 12;
             // Acquire for rough estimate of capacitance
             let mut baseline = 0;
@@ -285,7 +291,7 @@ const APP: () = {
         let max17048 = Max17048::new(i2c);
         let bms = BatteryManagement::new(max17048, chrg, stdby);
         let imgr = IngressManager::new();
-        let nmgr = NotificationManager::new();
+        let nmgr = NotificationManager::new(resources.NOTIFICATIONS);
 
         /* Give the application manager its ram */
         let ram: &'static mut [u8] = resources.APPLICATION_RAM;
@@ -315,6 +321,9 @@ const APP: () = {
         let mut system = System::new(rtc, bms, nmgr, amgr);
         system.ss().tsc_threshold = input_mgr.threshold();
         // rtfm::pend(crate::hal::interrupt::TIM2); // make sure systick runs first
+
+        info!("Free RAM after init(): {:#?}", System::get_free_stack());
+        info!("{:#?}", *system.ss());
 
         // Resources that need to be initialized are passed back here
         init::LateResources {
