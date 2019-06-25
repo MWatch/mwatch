@@ -5,6 +5,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "gdb",
+            "request": "launch",
+            "name": "Post-mortem",
+            "target": "./target/thumbv7em-none-eabi/debug/mwatch_kernel",
+            // "gdbpath": "arm-none-eabi-gdb",
+            "gdbpath": "/home/mabez/programs/gcc-arm-none-eabi-7-2017-q4-major/bin/arm-none-eabi-gdb",
+            "cwd": "${workspaceRoot}",
+            "autorun": [
+                "target remote :3333",
+                "set print asm-demangle on",
+                "x/s 0x20000000"
+            ]
+        },
+        {
             "type": "lldb",
             "request": "custom",
             "name": "LLDB - Release",

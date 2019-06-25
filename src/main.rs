@@ -5,8 +5,11 @@
 extern crate rtfm;
 #[cfg(feature = "itm")]
 extern crate panic_itm;
-#[cfg(not(feature = "itm"))]
+#[cfg(feature = "semihosting")]
 extern crate panic_semihosting;
+#[cfg(not(feature = "itm"))]
+extern crate panic_ramdump;
+
 #[macro_use]
 extern crate log;
 
@@ -65,6 +68,7 @@ use crate::system::{
         System,
         CPU_USAGE_POLL_HZ,
         TSC_HZ,
+        TSC_IDLE_HZ,
         SYSTICK_HZ,
         DMA_HALF_BYTES,
         SPI_MHZ,
@@ -97,6 +101,7 @@ const APP: () = {
     static mut TIM7: hal::timer::Timer<hal::stm32::TIM7> = ();
 
     /// Static resources
+    static mut TSC_DYN_TIM: u32 = TSC_HZ;
     static mut DMA_BUFFER: [[u8; crate::DMA_HALF_BYTES]; 2] = [[0; crate::DMA_HALF_BYTES]; 2];
     static mut SLEEP_TIME: u32 = 0;
     static mut TSC_EVENTS: u32 = 0;
@@ -352,12 +357,12 @@ const APP: () = {
 
     /// The main thread of the watch, this is called `SYSTICK_HZ` times a second, to perform 
     /// housekeeping operations
-    #[interrupt(binds = TIM2, resources = [IMNG, SYSTEM, SYSTICK, IDLE_COUNT], spawn = [display_manager])]
+    #[interrupt(binds = TIM2, resources = [IMNG, SYSTEM, SYSTICK, IDLE_COUNT, TSC_DYN_TIM], spawn = [display_manager])]
     fn systick() {
         let mut system = resources.SYSTEM;
         let mut mgr = resources.IMNG;
         let mut idle = resources.IDLE_COUNT;
-
+        let mut tsc_d = resources.TSC_DYN_TIM;
         spawn.display_manager().unwrap_or_else(|_err| {
             error!("Failed to spawn display manager");
         });
@@ -369,6 +374,15 @@ const APP: () = {
                 *val += 1; // append to idle count
                 value
             });
+
+            tsc_d.lock(|tsc_dyn|{
+                *tsc_dyn = if system.is_idle() {
+                    TSC_IDLE_HZ
+                } else {
+                    TSC_HZ
+                };
+            });
+
             mgr.lock(|m| {
                 m.process(system);
             });
@@ -377,7 +391,7 @@ const APP: () = {
     }
 
     /// Hardware timer, initiates tsc aquisitions
-    #[interrupt(binds = TIM6_DACUNDER, resources = [INPUT_MGR, TIM6], priority = 3)] // TIM6
+    #[interrupt(binds = TIM6_DACUNDER, resources = [INPUT_MGR, TIM6, TSC_DYN_TIM], priority = 3)] // TIM6
     fn tsc_initiator() {
         match resources.INPUT_MGR.start_new() {
             Ok(_) => {},
@@ -388,7 +402,7 @@ const APP: () = {
             }
         }
         // this should never panic as if we are in the IT the uif bit is set
-        resources.TIM6.wait().expect("TIM6 clear() failed"); 
+        resources.TIM6.start(resources.TSC_DYN_TIM.hz());
     }
 
     /// Thread runs once a second and collates stats about the system

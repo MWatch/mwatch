@@ -13,6 +13,7 @@ pub const DMA_HALF_BYTES: usize = 64;
 pub const CPU_USAGE_POLL_HZ: u32 = 1; // hz
 pub const SYSTICK_HZ: u32 = 3; // hz
 pub const TSC_HZ: u32 = (8 * 3); // 8 polls per second (for 3 inputs)
+pub const TSC_IDLE_HZ: u32 = (1 * 3); // 1 polls per second (for 3 inputs) when idle to save power
 
 pub const SYS_CLK_HZ: u32 = 16_000_000;
 pub const SPI_MHZ: u32 = SYS_CLK_HZ / 2_000_000; // spi is always half of sysclock

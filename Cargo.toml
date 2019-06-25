@@ -31,6 +31,7 @@ cortex-m-log = {  version = "0.4.0", features = ["itm", "log-integration"] }
 log = "0.4.6"
 crc = { version = "1.8.1", default-features = false }
 heapless = "0.4.2"
+panic-ramdump = "0.1.0"
 
 [dependencies.ssd1351]
 version = "0.2.2"
@@ -48,6 +49,7 @@ features = ["rt", "stm32l4x2"]
 [features]
 default = ["crc-fb"]
 itm = []
+semihosting = []
 disable-input = []
 crc-fb = []
 dyn-tsc-cal = []
